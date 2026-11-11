@@ -1,0 +1,1126 @@
+{% extends 'base.html' %}
+
+{% block title %}Thêm/Sửa Câu hỏi{% endblock %}
+{% block page_title %}Ngân hàng câu hỏi{% endblock %}
+
+{% block content %}
+{% if is_popup %}
+<style>
+    /* Ẩn toàn bộ giao diện khung để hiển thị gọn trong iframe modal */
+    header, nav, .sidebar, aside, footer, #header { display: none !important; }
+    #main-content, .main-content, body { margin-left: 0 !important; padding: 0 !important; background: #fff; }
+    .card { box-shadow: none !important; border: none !important; }
+    .btn-secondary.px-4 { display: none !important; } /* Hide 'Quay lại' button */
+</style>
+{% endif %}
+{% if is_from_exam %}
+<style>
+    /* Khóa các trường phân loại được kế thừa từ ma trận đề */
+    .exam-locked { pointer-events: none; opacity: 0.85; background-color: #e9ecef; }
+</style>
+{% endif %}
+
+{% if cau_hoi.NhomCauHoi and not is_popup %}
+<div class="row g-4">
+    <!-- Cột trái: Thông tin nhóm -->
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-info"><i class="fas fa-layer-group me-2"></i>Thuộc Nhóm Câu hỏi</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted small mb-1">Tên Nhóm</label>
+                    <div class="fw-bold">{{ cau_hoi.NhomCauHoi.TenNhom }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label text-muted small mb-1">Môn / Khối</label>
+                        <div class="fw-bold">{{ cau_hoi.NhomCauHoi.MonHoc.TenMon|default:"-" }} - {{ cau_hoi.NhomCauHoi.Khoi.TenKhoi|default:"-" }}</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small mb-1">Ngữ liệu chung</label>
+                    <div class="p-3 bg-light rounded border" style="white-space: pre-line;">{{ cau_hoi.NhomCauHoi.NoiDungChung|default:"-" }}</div>
+                </div>
+
+                {% if cau_hoi.NhomCauHoi.HinhAnh %}
+                <div class="mb-3">
+                    <label class="form-label text-muted small mb-1">Hình ảnh ngữ liệu</label>
+                    <div><img src="{{ cau_hoi.NhomCauHoi.HinhAnh.url }}" class="img-fluid rounded border shadow-sm"></div>
+                </div>
+                {% endif %}
+                
+                <div class="mt-4 pt-3 border-top text-center">
+                    <a href="{% url 'group_update' cau_hoi.NhomCauHoi.pk %}" class="btn btn-outline-primary"><i class="fas fa-edit me-2"></i>Chỉnh sửa Nhóm này</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Cột phải: Form câu hỏi -->
+    <div class="col-md-7">
+{% endif %}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0 fw-bold text-primary"><i class="fas fa-edit me-2"></i>{% if cau_hoi %}Sửa Câu hỏi{% else %}Thêm Câu hỏi mới{% endif %}</h5>
+    </div>
+    <div class="card-body">
+        
+
+            {% if readonly %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> Bạn đang xem câu hỏi ở chế độ chỉ đọc. Bạn không thể chỉnh sửa câu hỏi này.
+                </div>
+            {% endif %}
+
+            <form method="POST" enctype="multipart/form-data" id="questionForm">
+                {% csrf_token %}
+                <fieldset {% if readonly %}disabled{% endif %}>
+                {% if next_url %}<input type="hidden" name="next_url" value="{{ next_url }}">{% endif %}
+                {% if is_popup %}<input type="hidden" name="popup" value="1">{% endif %}
+                {% if is_from_exam %}<input type="hidden" name="is_from_exam" value="1">{% endif %}
+                
+                <h6 class="fw-bold text-secondary mb-3">Phân loại & Thuộc tính</h6>
+            <div class="row g-3 mb-4 bg-light p-3 rounded">
+                {% if not cau_hoi.NhomCauHoi %}
+                <div class="col-md-3">
+                    <label class="form-label">Khối <span class="text-danger">*</span></label>
+                    <select name="Khoi" class="form-select {% if is_from_exam %}exam-locked{% endif %}" required>
+                        <option value="">-- Chọn Khối --</option>
+                        {% for k in khois %}
+                        <option value="{{ k.pk }}" {% if cau_hoi.Khoi_id == k.pk or default_khoi == k.pk|stringformat:"s" %}selected{% endif %}>{{ k.TenKhoi }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Môn học <span class="text-danger">*</span></label>
+                    <select name="MonHoc" class="form-select {% if is_from_exam %}exam-locked{% endif %}" required>
+                        <option value="">-- Chọn Môn --</option>
+                        {% for m in mons %}
+                        <option value="{{ m.pk }}" {% if cau_hoi.MonHoc_id == m.pk or default_mon == m.pk|stringformat:"s" %}selected{% endif %}>{{ m.TenMon }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Mạch kiến thức <span class="text-danger">*</span></label>
+                    <select name="MachKienThuc" class="form-select {% if is_from_exam %}exam-locked{% endif %}" required>
+                        <option value="">-- Chọn Mạch KT --</option>
+                        {% for m in machs %}
+                        <option value="{{ m.pk }}" data-mon="{{ m.MonHoc_id }}" data-khoi="{{ m.Khoi_id }}" {% if cau_hoi.MachKienThuc_id == m.pk %}selected{% endif %}>{{ m.TenMach }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Nội dung KT <span class="text-danger">*</span></label>
+                    <select name="NoiDungKienThuc" class="form-select {% if is_from_exam %}exam-locked{% endif %}" required>
+                        <option value="">-- Chọn ND KT --</option>
+                        {% for nd in noidungs %}
+                        <option value="{{ nd.pk }}" data-mach="{{ nd.MachKienThuc_id }}" {% if cau_hoi.NoiDungKienThuc_id == nd.pk %}selected{% endif %}>{{ nd.TenNoidung }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <input type="hidden" name="Khoi" value="{{ cau_hoi.Khoi_id|default:'' }}">
+                <input type="hidden" name="MonHoc" value="{{ cau_hoi.MonHoc_id|default:'' }}">
+                <input type="hidden" name="MachKienThuc" value="{{ cau_hoi.MachKienThuc_id|default:'' }}">
+                <input type="hidden" name="NoiDungKienThuc" value="{{ cau_hoi.NoiDungKienThuc_id|default:'' }}">
+                {% endif %}
+                
+                <div class="col-md-4">
+                    <label class="form-label">Hình thức <span class="text-danger">*</span></label>
+                    <select name="HinhThuc" id="hinhThuc" class="form-select {% if is_from_exam %}exam-locked{% endif %}" required>
+                        <option value="Trắc nghiệm" {% if cau_hoi.HinhThuc == 'Trắc nghiệm' or default_hinh_thuc == 'Trắc nghiệm' %}selected{% endif %}>Trắc nghiệm</option>
+                        <option value="Tự luận" {% if cau_hoi.HinhThuc == 'Tự luận' or default_hinh_thuc == 'Tự luận' %}selected{% endif %}>Tự luận</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Dạng câu hỏi <span class="text-danger">*</span></label>
+                    <select name="DangCauHoi" id="dangCauHoi" class="form-select" required
+                            data-current-dang="{{ cau_hoi.DangCauHoi|default:'' }}">
+                        <!-- Options generated by JS -->
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Mức độ <span class="text-danger">*</span></label>
+                    <select name="MucDo" class="form-select {% if is_from_exam %}exam-locked{% endif %}" required>
+                        <option value="Mức 1" {% if cau_hoi.MucDo == 'Mức 1' or default_muc_do == 'Mức 1' %}selected{% endif %}>Mức 1</option>
+                        <option value="Mức 2" {% if cau_hoi.MucDo == 'Mức 2' or default_muc_do == 'Mức 2' %}selected{% endif %}>Mức 2</option>
+                        <option value="Mức 3" {% if cau_hoi.MucDo == 'Mức 3' or default_muc_do == 'Mức 3' %}selected{% endif %}>Mức 3</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Nút gợi ý câu hỏi bằng AI -->
+            <div class="mb-3 d-flex align-items-center gap-2">
+                <button type="button" id="btnAiSuggestQ" class="btn btn-sm btn-outline-primary fw-semibold" onclick="aiSuggestQuestion()">
+                    <i class="fas fa-lightbulb me-1"></i>✨ Gợi ý câu hỏi bằng AI
+                </button>
+                <input type="text" id="aiQuestionRequirement" class="form-control form-control-sm"
+                    placeholder="Yêu cầu thêm (VD: về cây cối, dễ hiểu, thực tế...)"
+                    style="max-width: 300px;">
+                <span id="aiSuggestQStatus" class="small text-muted"></span>
+            </div>
+
+            <h6 class="fw-bold text-secondary mb-3">Nội dung câu hỏi <span class="text-danger">*</span></h6>
+            <div class="mb-4">
+                <textarea name="NoiDungCauHoi" id="noiDungCauHoi" class="form-control mb-2" rows="4" required placeholder="Nhập nội dung câu hỏi...">{{ cau_hoi.NoiDungCauHoi }}</textarea>
+                <button type="button" id="btnAiSuggest" class="btn btn-sm btn-outline-warning fw-semibold" onclick="aiSuggestAnswers()">
+                    <i class="fas fa-robot me-1"></i>✨ Gợi ý đáp án bằng AI
+                </button>
+                <input type="text" id="aiRequirement" class="form-control form-control-sm d-inline-block ms-2"
+                    placeholder="Yêu cầu thêm (VD: tạo 3 đáp án, dung dị lớ p 3...)"
+                    style="width: 280px; vertical-align: middle;">
+                <span id="aiSuggestStatus" class="ms-2 small text-muted"></span>
+                <div>
+                    <label class="form-label small text-muted"><i class="fas fa-image me-1"></i>Đính kèm hình ảnh (nếu có)</label>
+                    <div class="input-group input-group-sm mt-1" style="width: max-content;">
+                        <label class="input-group-text bg-white cursor-pointer px-3" title="Thêm ảnh câu hỏi" style="cursor:pointer; height: 31px;">
+                            <i class="fas fa-camera text-primary camera-icon {% if cau_hoi.HinhAnh %}d-none{% endif %}"></i>
+                            <img class="img-preview {% if not cau_hoi.HinhAnh %}d-none{% endif %}" style="height: 20px; max-width: 40px; object-fit: contain;" src="{% if cau_hoi.HinhAnh %}{{ cau_hoi.HinhAnh.url }}{% endif %}">
+                            <input type="file" name="HinhAnh" id="fileCauHoi" class="d-none" accept="image/*" onchange="
+                                document.getElementById('xoaHinhAnhCauHoi').checked = false;
+                                previewIcon(this);
+                            ">
+                        </label>
+                        <a class="btn btn-outline-primary {% if not cau_hoi.HinhAnh %}d-none{% endif %} px-3" href="{% if cau_hoi.HinhAnh %}{{ cau_hoi.HinhAnh.url }}{% else %}#{% endif %}" target="_blank" title="Xem ảnh" style="display: flex; align-items: center;"><i class="fas fa-external-link-alt"></i></a>
+                        <button class="btn btn-outline-danger {% if not cau_hoi.HinhAnh %}d-none{% endif %} px-3" type="button" title="Xóa ảnh" style="display: flex; align-items: center;" onclick="
+                            const inp = document.getElementById('fileCauHoi'); 
+                            inp.value=''; 
+                            document.getElementById('xoaHinhAnhCauHoi').checked = true;
+                            previewIcon(inp);
+                        "><i class="fas fa-trash-alt"></i></button>
+                        <input type="checkbox" name="XoaHinhAnh" id="xoaHinhAnhCauHoi" class="d-none">
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-secondary mb-3 border-top pt-4">Thiết lập đáp án</h6>
+            
+            <!-- Khu vực nhập đáp án động -->
+            <div id="answersContainer" class="mb-4 p-3 border rounded bg-light">
+                <!-- Nội dung được sinh ra bởi JS dựa trên Dạng câu hỏi -->
+            </div>
+
+            </div>
+            </fieldset>
+
+            <div class="d-flex justify-content-between mt-3 border-top pt-3 px-3">
+                <a href="{% url 'question_list' %}" class="btn btn-secondary px-4" {% if not readonly %}onclick="return confirmCancel(event);"{% endif %}>{% if readonly %}Quay lại{% else %}Hủy{% endif %}</a>
+                {% if not readonly %}
+                <button type="submit" class="btn btn-primary px-5"><i class="fas fa-save me-2"></i>Lưu Câu hỏi</button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if cau_hoi.NhomCauHoi and not is_popup %}
+    </div> <!-- Close col-md-7 -->
+</div> <!-- Close row -->
+{% endif %}
+
+{% if cau_hoi %}<pre id="__dapAnMauData" class="d-none">{{ cau_hoi.DapAnMau }}</pre>{% endif %}
+
+{# Textarea an cho Essay - render server-side de tranh loi JS encoding #}
+<div id="__essayAnswerBlock" class="d-none">
+    <span class="text-muted d-block mb-2">Nhập đáp án mẫu hoặc hướng dẫn chấm:</span>
+    <textarea name="DapAnMau" id="__essayDapAnMauTA" class="form-control mb-2" rows="5" placeholder="Nội dung đáp án mẫu...">{{ cau_hoi.DapAnMau|default:'' }}</textarea>
+    <label class="form-label small text-muted"><i class="fas fa-image me-1"></i>Đính kèm hình ảnh đáp án (nếu có)</label>
+    {% if cau_hoi and cau_hoi.dap_ans.exists %}
+        {% for da in cau_hoi.dap_ans.all %}
+            {% if da.HinhAnh %}
+            <div class="mb-2"><a href="{{ da.HinhAnh.url }}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-image me-1"></i>Xem ảnh hiện có</a></div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    <div class="d-flex align-items-center gap-2 mt-1">
+        <label class="btn btn-outline-primary btn-sm mb-0 px-3" title="Thêm hình ảnh đáp án">
+            <i class="fas fa-camera camera-icon"></i>
+            <img class="img-preview d-none" style="height: 24px; max-width: 60px; object-fit: contain;">
+            <input type="file" name="HinhAnhDapAn" class="d-none" accept="image/*" onchange="previewIcon(this)">
+        </label>
+        <a class="btn btn-outline-info btn-sm px-3 d-none" target="_blank" title="Xem ảnh"><i class="fas fa-external-link-alt"></i></a>
+        <button class="btn btn-outline-danger btn-sm px-3 d-none" type="button" title="Xóa ảnh" onclick="const inp=this.parentElement.querySelector('input[type=file]'); inp.value=''; previewIcon(inp);"><i class="fas fa-trash-alt"></i></button>
+    </div>
+</div>
+
+<script>
+    window.addEventListener('error', function(e) {
+        alert("Lỗi Giao Diện: " + e.message + "\nDòng: " + e.lineno);
+    });
+
+    const hinhThucSelect = document.getElementById('hinhThuc');
+    const dangCauHoiSelect = document.getElementById('dangCauHoi');
+    const answersContainer = document.getElementById('answersContainer');
+
+
+    // Đọc dữ liệu từ server qua data-* attribute (tránh lỗi encoding Unicode trong JS string)
+    const currentDang = dangCauHoiSelect.dataset.currentDang || '';
+    let existingDapAns = [];
+    try {
+        existingDapAns = JSON.parse('{{ dap_ans_json|default:"[]"|escapejs }}');
+    } catch (e) {
+        console.error("Lỗi parse dap_ans_json:", e);
+    }
+    const isEditMode = {% if cau_hoi %}true{% else %}false{% endif %};
+    const __dapAnMauEl = document.getElementById('__dapAnMauData');
+    const __dapAnMau = __dapAnMauEl ? __dapAnMauEl.textContent : '';
+
+    const ESSAY_DANGS = ['EssayShort', 'EssayLong', 'Tự luận', 'Tự luận ngắn', 'Tự luận dài', 'TL'];
+    const TRACNGHIEM_DANGS = [
+        {value: 'MCQ',      text: 'Nhiều lựa chọn (Single Choice)'},
+        {value: 'MSQ',      text: 'Nhiều lựa chọn (Multiple Choice)'},
+        {value: 'TF',       text: 'Đúng/Sai'},
+        {value: 'Matching', text: 'Ghép nối'},
+        {value: 'FIB',      text: 'Điền khuyết'}
+    ];
+    const TULUAN_DANGS = [
+        {value: 'EssayShort', text: 'Tự luận ngắn'},
+        {value: 'EssayLong',  text: 'Tự luận dài'}
+    ];
+
+    function isEssayDang(dang) {
+        return ESSAY_DANGS.includes(dang);
+    }
+    
+    // Convert old/db values to standard keys
+    function normalizeDang(dang) {
+        try {
+            if (!dang) return '';
+            const d = dang.toString().trim().toLowerCase();
+            if (d === 'trắc nghiệm' || d === 'trắc nghiệm 4 lựa chọn') return 'MCQ';
+            if (d === 'tự luận' || d === 'tự luận ngắn' || d === 'tl') return 'EssayShort';
+            if (d === 'tự luận dài') return 'EssayLong';
+            return dang.toString().trim();
+        } catch (e) {
+            console.error("Lỗi normalizeDang", e);
+            return 'EssayShort';
+        }
+    }
+
+
+    // Populate dropdown DangCauHoi theo HinhThuc hiện tại, rồi chọn selectDang
+    function populateDangDropdown(selectDang) {
+        try {
+            // Xác định hình thức dựa trên selectedIndex (0=Trắc nghiệm, 1=Tự luận)
+            const isTuLuan = (hinhThucSelect.selectedIndex === 1);
+            const opts = isTuLuan ? TULUAN_DANGS : TRACNGHIEM_DANGS;
+
+            dangCauHoiSelect.innerHTML = '';
+            opts.forEach(function(opt) {
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.textContent = opt.text;
+                dangCauHoiSelect.appendChild(el);
+            });
+
+            // Chọn đúng giá trị cần select
+            if (selectDang && dangCauHoiSelect.querySelector('option[value="' + selectDang + '"]')) {
+                dangCauHoiSelect.value = selectDang;
+            } else if (dangCauHoiSelect.options.length > 0) {
+                dangCauHoiSelect.selectedIndex = 0;
+            }
+            
+            // Buộc currentDang cập nhật để renderAnswerArea dùng
+            if (!dangCauHoiSelect.value && dangCauHoiSelect.options.length > 0) {
+                dangCauHoiSelect.selectedIndex = 0;
+            }
+        } catch (e) {
+            console.error("Lỗi populateDangDropdown:", e);
+        }
+    }
+
+    function initForm() {
+        try {
+            const normDang = normalizeDang(currentDang);
+            if (isEditMode && normDang) {
+                // Set đúng HinhThuc select dựa trên currentDang từ server
+                hinhThucSelect.selectedIndex = isEssayDang(normDang) ? 1 : 0;
+                // Populate DangCauHoi và chọn đúng
+                populateDangDropdown(normDang);
+            } else {
+                // Tạo mới: populate theo HinhThuc mặc định đang chọn
+                populateDangDropdown(hinhThucSelect.value === 'Tự luận' ? 'EssayShort' : 'MCQ');
+            }
+            renderAnswerArea();
+        } catch (e) {
+            console.error("Lỗi initForm:", e);
+            alert("Lỗi khi khởi tạo form: " + e.message);
+        }
+    }
+
+    // Khi user đổi HinhThuc → populate lại DangCauHoi với option đầu tiên
+    try {
+        hinhThucSelect.addEventListener('change', function() {
+            populateDangDropdown(null);
+            renderAnswerArea();
+        });
+        // Khi user đổi DangCauHoi → re-render phần đáp án
+        dangCauHoiSelect.addEventListener('change', renderAnswerArea);
+    } catch(e) {}
+
+    function renderAnswerArea() {
+        try {
+            const dang = dangCauHoiSelect.value || currentDang || 'EssayShort';
+
+            // Nếu đang chứa essay block mà dang không còn là Essay → trả essay block ra ngoài
+            const essayBlockEl = document.getElementById('__essayAnswerBlock');
+            if (essayBlockEl && answersContainer.contains(essayBlockEl) && !isEssayDang(dang)) {
+                document.body.appendChild(essayBlockEl);
+                essayBlockEl.classList.add('d-none');
+            }
+
+            if (dang === 'MCQ' || dang === 'MSQ') {
+                const inputType = dang === 'MCQ' ? 'radio' : 'checkbox';
+                answersContainer.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Nhập các phương án và đánh dấu vào đáp án đúng:</span>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addChoiceRow('${inputType}')"><i class="fas fa-plus me-1"></i>Thêm phương án</button>
+                    </div>
+                    <div id="choicesList"></div>`;
+                if (isEditMode && existingDapAns.length > 0) {
+                    existingDapAns.forEach(function(da) { addChoiceRow(inputType, da); });
+                } else {
+                    for (let i = 0; i < 4; i++) addChoiceRow(inputType);
+                }
+
+            } else if (dang === 'TF') {
+                const savedLabels = "{{ cau_hoi.DapAnMau|default:'Đúng, Sai'|escapejs }}";
+                const isGroupTF = {% if cau_hoi.NhomCauHoi %}true{% else %}false{% endif %};
+                const guideText = isGroupTF ? "Chọn đáp án đúng/sai theo đoạn văn sau:" : "Chọn đáp án đúng/sai cho câu sau:";
+                answersContainer.innerHTML = `
+                    <div class="alert alert-info py-2 px-3 mb-3 fw-bold small">
+                        <i class="fas fa-info-circle me-2"></i>Hướng dẫn hiển thị: <span class="text-primary">${guideText}</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Các ký hiệu lựa chọn (Cách nhau bởi dấu phẩy, VD: Đ, S hoặc T, F, NG)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="tfLabelsInput" name="TfLabels" class="form-control" value="${isEditMode ? savedLabels : 'Đúng, Sai'}" required>
+                            <button class="btn btn-primary" type="button" onclick="updateTFColumns()">Cập nhật cột lựa chọn</button>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Nhập các mệnh đề và chọn đáp án:</span>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addTFRow()"><i class="fas fa-plus me-1"></i>Thêm mệnh đề</button>
+                    </div>
+                    <div id="tfList"></div>`;
+                if (isEditMode && existingDapAns.length > 0) {
+                    existingDapAns.forEach(function(da) { addTFRow(da); });
+                } else {
+                    for (let i = 0; i < 4; i++) addTFRow();
+                }
+
+            } else if (dang === 'Matching') {
+                answersContainer.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted fw-bold">Nhập các cặp nội dung ghép nối (Cột A và Cột B tương ứng):</span>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addMatchRow()"><i class="fas fa-plus me-1"></i>Thêm cặp ghép</button>
+                    </div>
+                    <div id="matchList"></div>`;
+                if (isEditMode && existingDapAns.length > 0) {
+                    existingDapAns.forEach(function(da) { addMatchRow(da); });
+                } else {
+                    for (let i = 0; i < 3; i++) addMatchRow();
+                }
+
+            } else if (dang === 'FIB') {
+                const fibValue = isEditMode ? existingDapAns.map(function(da) { return da.NoiDung; }).join('\n') : '';
+                answersContainer.innerHTML = `
+                    <div class="alert alert-light border py-2 px-3 mb-3 small d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-info-circle text-primary me-1"></i>
+                            <strong>Mẹo điền khuyết:</strong> Trong nội dung câu hỏi, bạn có thể dùng ký hiệu <code>[...]</code> cho các vị trí khuyết.
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="insertFIBBlank()">
+                            <i class="fas fa-plus-circle me-1"></i>Chèn [...] vào đề
+                        </button>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted fw-bold">Danh sách đáp án cho từng vị trí khuyết (theo thứ tự):</span>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addFIBRow()"><i class="fas fa-plus me-1"></i>Thêm vị trí khuyết</button>
+                    </div>
+                    <div id="fibList"></div>
+                    <textarea name="DapAnFIB" id="dapAnFIBHidden" class="d-none">${fibValue}</textarea>`;
+                if (isEditMode && existingDapAns.length > 0) {
+                    existingDapAns.forEach(function(da) { addFIBRow(da.NoiDung); });
+                } else {
+                    addFIBRow();
+                    addFIBRow();
+                }
+
+            } else if (isEssayDang(dang)) {
+                const essayBlock = document.getElementById('__essayAnswerBlock');
+                if (essayBlock) {
+                    if (!answersContainer.contains(essayBlock)) {
+                        answersContainer.innerHTML = '';
+                        essayBlock.classList.remove('d-none');
+                        answersContainer.appendChild(essayBlock);
+                    } else {
+                        // Force make sure it is visible if it was already inside
+                        essayBlock.classList.remove('d-none');
+                    }
+                } else {
+                    answersContainer.innerHTML = `
+                        <span class="text-muted d-block mb-2">Nhập đáp án mẫu hoặc hướng dẫn chấm:</span>
+                        <textarea name="DapAnMau" class="form-control mb-2" rows="5" placeholder="Nội dung đáp án mẫu..."></textarea>
+                        <label class="form-label small text-muted"><i class="fas fa-image me-1"></i>Đính kèm hình ảnh đáp án (nếu có)</label>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            <label class="btn btn-outline-primary btn-sm mb-0 px-3" title="Thêm hình ảnh đáp án">
+                                <i class="fas fa-camera camera-icon"></i>
+                                <img class="img-preview d-none" style="height: 24px; max-width: 60px; object-fit: contain;">
+                                <input type="file" name="HinhAnhDapAn" class="d-none" accept="image/*" onchange="previewIcon(this)">
+                            </label>
+                            <a class="btn btn-outline-info btn-sm px-3 d-none" target="_blank" title="Xem ảnh"><i class="fas fa-external-link-alt"></i></a>
+                            <button class="btn btn-outline-danger btn-sm px-3 d-none" type="button" title="Xóa ảnh" onclick="const inp=this.parentElement.querySelector('input[type=file]'); inp.value=''; previewIcon(inp);"><i class="fas fa-trash-alt"></i></button>
+                        </div>`;
+                }
+            } else {
+                answersContainer.innerHTML = "<div class='alert alert-warning'>Vui lòng chọn Dạng câu hỏi để thiết lập đáp án.</div>";
+            }
+        } catch (e) {
+            console.error("Lỗi renderAnswerArea:", e);
+            alert("Lỗi khi vẽ khu vực đáp án: " + e.message);
+        }
+    }
+
+    // Alias cũ để không break các html event
+    function updateAnswerArea() { renderAnswerArea(); }
+    function updateDangCauHoi() { populateDangDropdown(currentDang); renderAnswerArea(); }
+
+    function addChoiceRow(inputType, data) {
+        try {
+            const list = document.getElementById('choicesList');
+            const index = list.children.length;
+            const row = document.createElement('div');
+            row.className = 'input-group mb-2';
+            const defaultLabel = data ? data.NoiDungTrai : String.fromCharCode(65 + index);
+            const content = data ? data.NoiDung : '';
+            const isChecked = data ? data.LaDapAnDung : false;
+            const imgUrl = data ? data.HinhAnh : '';
+            row.innerHTML = `
+                <div class="input-group-text bg-white">
+                    <input class="form-check-input mt-0" type="${inputType}" name="IsCorrect" value="${index}" ${isChecked ? 'checked' : ''}>
+                </div>
+                <input type="text" name="ChoiceLabel" class="form-control text-center fw-bold text-primary" style="max-width: 50px;" value="${defaultLabel}" required title="Ký hiệu (A, B, C...)">
+                <input type="text" name="ChoiceContent" class="form-control" placeholder="Nội dung phương án..." value="${content.replace(/"/g, '&quot;')}" required>
+                <label class="input-group-text bg-white cursor-pointer px-2" title="Thêm hình ảnh" style="cursor:pointer;">
+                    <i class="fas fa-camera text-primary camera-icon ${imgUrl ? 'd-none' : ''}"></i>
+                    <img class="img-preview ${imgUrl ? '' : 'd-none'}" style="height: 20px; max-width: 40px; object-fit: contain;" src="${imgUrl}">
+                    <input type="file" name="ChoiceImage_${index}" class="d-none" accept="image/*" onchange="previewIcon(this)">
+                </label>
+                <a class="btn btn-outline-primary ${imgUrl ? '' : 'd-none'} px-3" href="${imgUrl}" target="_blank" title="Xem ảnh"><i class="fas fa-external-link-alt"></i></a>
+                <button class="btn btn-outline-danger ${imgUrl ? '' : 'd-none'} px-3" type="button" title="Xóa ảnh" onclick="const inp = this.previousElementSibling.previousElementSibling.querySelector('input[type=file]'); inp.value=''; previewIcon(inp);"><i class="fas fa-trash-alt"></i></button>
+                <button class="btn btn-outline-danger px-2" type="button" title="Xóa phương án" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            `;
+            list.appendChild(row);
+        } catch(e) { console.error("Lỗi addChoiceRow", e); }
+    }
+    
+    function addTFRow(data) {
+        try {
+            const list = document.getElementById('tfList');
+            const labelsInput = document.getElementById('tfLabelsInput');
+            const labels = labelsInput ? labelsInput.value.split(',').map(s => s.trim()).filter(s => s) : ['Đúng', 'Sai'];
+            
+            const index = list.children.length;
+            const row = document.createElement('div');
+            row.className = 'input-group mb-2';
+            const content = data ? data.NoiDung : '';
+            const correctVal = data ? data.NoiDungTrai : '';
+            const imgUrl = data ? data.HinhAnh : '';
+
+            let radiosHtml = '';
+            labels.forEach(lbl => {
+                const checked = correctVal === lbl ? 'checked' : '';
+                radiosHtml += `<label class="mb-0 text-dark small me-3" style="cursor:pointer;"><input type="radio" name="TFCorrect_${index}" value="${lbl}" ${checked} required> ${lbl}</label>`;
+            });
+
+            row.innerHTML = `
+                <span class="input-group-text">${index + 1}</span>
+                <input type="hidden" name="TFIndex" value="${index}">
+                <input type="text" name="TFContent" class="form-control" placeholder="Nội dung mệnh đề..." value="${content.replace(/"/g, '&quot;')}" required>
+                <div class="input-group-text bg-white px-3 tf-radios">
+                    ${radiosHtml}
+                </div>
+                <label class="input-group-text bg-white cursor-pointer px-2" title="Thêm hình ảnh" style="cursor:pointer;">
+                    <i class="fas fa-camera text-primary camera-icon ${imgUrl ? 'd-none' : ''}"></i>
+                    <img class="img-preview ${imgUrl ? '' : 'd-none'}" style="height: 20px; max-width: 40px; object-fit: contain;" src="${imgUrl}">
+                    <input type="file" name="TFImage_${index}" class="d-none" accept="image/*" onchange="previewIcon(this)">
+                </label>
+                <a class="btn btn-outline-primary ${imgUrl ? '' : 'd-none'} px-3" href="${imgUrl}" target="_blank" title="Xem ảnh"><i class="fas fa-external-link-alt"></i></a>
+                <button class="btn btn-outline-danger ${imgUrl ? '' : 'd-none'} px-3" type="button" title="Xóa ảnh" onclick="const inp = this.previousElementSibling.previousElementSibling.querySelector('input[type=file]'); inp.value=''; previewIcon(inp);"><i class="fas fa-trash-alt"></i></button>
+                <button class="btn btn-outline-danger px-2" type="button" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            `;
+            list.appendChild(row);
+        } catch(e) { console.error("Lỗi addTFRow", e); }
+    }
+    
+    function updateTFColumns() {
+        const labelsInput = document.getElementById('tfLabelsInput');
+        const labels = labelsInput.value.split(',').map(s => s.trim()).filter(s => s);
+        if (labels.length === 0) return;
+        
+        const rows = document.querySelectorAll('#tfList .input-group');
+        rows.forEach((row) => {
+            const idxInput = row.querySelector('input[name="TFIndex"]');
+            if(!idxInput) return;
+            const index = idxInput.value;
+            
+            const radioContainer = row.querySelector('.tf-radios');
+            let radiosHtml = '';
+            labels.forEach(lbl => {
+                radiosHtml += `<label class="mb-0 text-dark small me-3" style="cursor:pointer;"><input type="radio" name="TFCorrect_${index}" value="${lbl}" required> ${lbl}</label>`;
+            });
+            radioContainer.innerHTML = radiosHtml;
+        });
+    }
+
+    function insertFIBBlank() {
+        const textarea = document.getElementById('noiDungCauHoi');
+        if (!textarea) return;
+        const start = textarea.selectionStart !== undefined ? textarea.selectionStart : textarea.value.length;
+        const end = textarea.selectionEnd !== undefined ? textarea.selectionEnd : textarea.value.length;
+        const text = textarea.value;
+        textarea.value = text.substring(0, start) + ' [...] ' + text.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 7;
+        textarea.focus();
+        textarea.dispatchEvent(new Event('input'));
+        addFIBRow();
+    }
+
+    function addFIBRow(val) {
+        try {
+            const list = document.getElementById('fibList');
+            if (!list) return;
+            const row = document.createElement('div');
+            row.className = 'input-group mb-2 fib-row';
+            row.innerHTML = `
+                <span class="input-group-text bg-light fw-bold text-secondary fib-label" style="min-width: 120px;">Vị trí [...]</span>
+                <input type="text" name="FIBAnswer" class="form-control" placeholder="Nhập đáp án đúng cho ô trống..." value="${(val || '').replace(/"/g, '&quot;')}" required oninput="syncFIBHidden()">
+                <button class="btn btn-outline-danger px-3" type="button" onclick="this.parentElement.remove(); reindexFIBRows(); syncFIBHidden();"><i class="fas fa-times"></i></button>
+            `;
+            list.appendChild(row);
+            reindexFIBRows();
+            syncFIBHidden();
+        } catch(e) { console.error("Lỗi addFIBRow", e); }
+    }
+
+    function reindexFIBRows() {
+        const rows = document.querySelectorAll('#fibList .fib-row');
+        rows.forEach((r, idx) => {
+            const lbl = r.querySelector('.fib-label');
+            if (lbl) lbl.textContent = `Vị trí [${idx + 1}]`;
+        });
+    }
+
+    function syncFIBHidden() {
+        const ta = document.getElementById('dapAnFIBHidden');
+        if (!ta) return;
+        const inputs = document.querySelectorAll('input[name="FIBAnswer"]');
+        ta.value = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean).join('\n');
+    }
+
+    function addMatchRow(data) {
+        try {
+            const list = document.getElementById('matchList');
+            if (!list) return;
+            const row = document.createElement('div');
+            row.className = 'input-group mb-2 match-row';
+            const leftVal = data ? (data.NoiDungTrai || '') : '';
+            const rightVal = data ? (data.NoiDung || '') : '';
+            const imgLeft = data ? (data.HinhAnhTrai || '') : '';
+            const imgRight = data ? (data.HinhAnh || '') : '';
+            row.innerHTML = `
+                <input type="hidden" name="ExistingMatchImageLeft" value="${imgLeft}">
+                <input type="hidden" name="ExistingMatchImageRight" value="${imgRight}">
+                <label class="input-group-text bg-white cursor-pointer px-2" title="Ảnh vế trái" style="cursor:pointer;">
+                    <i class="fas fa-camera text-primary camera-icon ${imgLeft ? 'd-none' : ''}"></i>
+                    <img class="img-preview ${imgLeft ? '' : 'd-none'}" style="height: 20px; max-width: 40px; object-fit: contain;" src="${imgLeft}">
+                    <input type="file" class="match-img-left d-none" accept="image/*" onchange="previewIcon(this)">
+                </label>
+                <a class="btn btn-outline-primary ${imgLeft ? '' : 'd-none'} px-2" href="${imgLeft}" target="_blank" title="Xem ảnh"><i class="fas fa-external-link-alt"></i></a>
+                <button class="btn btn-outline-danger ${imgLeft ? '' : 'd-none'} px-2" type="button" title="Xóa ảnh" onclick="clearMatchImg(this, 'left')"><i class="fas fa-trash-alt"></i></button>
+                <input type="text" name="MatchLeft" class="form-control" placeholder="Cột A (Vế trái)..." value="${leftVal.replace(/"/g, '&quot;')}" required>
+                <span class="input-group-text bg-light text-primary"><i class="fas fa-arrows-alt-h"></i></span>
+                <input type="text" name="MatchRight" class="form-control" placeholder="Cột B (Vế phải)..." value="${rightVal.replace(/"/g, '&quot;')}" required>
+                <label class="input-group-text bg-white cursor-pointer px-2" title="Ảnh vế phải" style="cursor:pointer;">
+                    <i class="fas fa-camera text-primary camera-icon ${imgRight ? 'd-none' : ''}"></i>
+                    <img class="img-preview ${imgRight ? '' : 'd-none'}" style="height: 20px; max-width: 40px; object-fit: contain;" src="${imgRight}">
+                    <input type="file" class="match-img-right d-none" accept="image/*" onchange="previewIcon(this)">
+                </label>
+                <a class="btn btn-outline-primary ${imgRight ? '' : 'd-none'} px-2" href="${imgRight}" target="_blank" title="Xem ảnh"><i class="fas fa-external-link-alt"></i></a>
+                <button class="btn btn-outline-danger ${imgRight ? '' : 'd-none'} px-2" type="button" title="Xóa ảnh" onclick="clearMatchImg(this, 'right')"><i class="fas fa-trash-alt"></i></button>
+                <button class="btn btn-outline-danger px-2" type="button" onclick="this.parentElement.remove(); reindexMatchRows();"><i class="fas fa-times"></i></button>
+            `;
+            list.appendChild(row);
+            reindexMatchRows();
+        } catch(e) { console.error("Lỗi addMatchRow", e); }
+    }
+
+    function clearMatchImg(btn, side) {
+        const row = btn.closest('.match-row');
+        if (!row) return;
+        if (side === 'left') {
+            row.querySelector('input[name="ExistingMatchImageLeft"]').value = '';
+            const inp = row.querySelector('.match-img-left');
+            if (inp) { inp.value = ''; previewIcon(inp); }
+        } else {
+            row.querySelector('input[name="ExistingMatchImageRight"]').value = '';
+            const inp = row.querySelector('.match-img-right');
+            if (inp) { inp.value = ''; previewIcon(inp); }
+        }
+        btn.classList.add('d-none');
+        if (btn.previousElementSibling) btn.previousElementSibling.classList.add('d-none');
+    }
+
+    function reindexMatchRows() {
+        const rows = document.querySelectorAll('#matchList .match-row');
+        rows.forEach((r, idx) => {
+            const leftInp = r.querySelector('.match-img-left');
+            const rightInp = r.querySelector('.match-img-right');
+            if (leftInp) leftInp.name = `MatchImageLeft_${idx}`;
+            if (rightInp) rightInp.name = `MatchImageRight_${idx}`;
+        });
+    }
+
+    try {
+        dangCauHoiSelect.addEventListener('change', updateAnswerArea);
+    } catch(e){}
+
+    // Cascading Dropdowns
+    try {
+        document.querySelector('select[name="MonHoc"]').addEventListener('change', filterMach);
+        document.querySelector('select[name="Khoi"]').addEventListener('change', filterMach);
+        document.querySelector('select[name="MachKienThuc"]').addEventListener('change', filterNoiDung);
+    } catch(e) {}
+
+    function filterMach() {
+        try {
+            const monId = document.querySelector('select[name="MonHoc"]').value;
+            const khoiId = document.querySelector('select[name="Khoi"]').value;
+            const machSelect = document.querySelector('select[name="MachKienThuc"]');
+            
+            // Fetch new MachKienThuc list based on monId and khoiId
+            if (khoiId || monId) {
+                fetch(`/cau-hoi/api/mach-theo-mon-khoi/?khoi_id=${khoiId}&mon_id=${monId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const currentVal = machSelect.value;
+                        machSelect.innerHTML = '<option value="">-- Chọn Mạch KT --</option>';
+                        data.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.id;
+                            opt.textContent = item.TenMach;
+                            if (item.id == currentVal) opt.selected = true;
+                            machSelect.appendChild(opt);
+                        });
+                        filterNoiDung();
+                    }).catch(e => { console.error(e); filterNoiDung(); });
+            } else {
+                filterNoiDung();
+            }
+        } catch(e) { console.error("Lỗi filterMach", e); }
+    }
+
+    function filterNoiDung() {
+        try {
+            const machId = document.querySelector('select[name="MachKienThuc"]').value;
+            const ndSelect = document.querySelector('select[name="NoiDungKienThuc"]');
+            
+            if (machId) {
+                fetch(`/cau-hoi/api/noidung-theo-mach/?mach_id=${machId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const currentVal = ndSelect.value;
+                        ndSelect.innerHTML = '<option value="">-- Chọn ND KT --</option>';
+                        data.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.id;
+                            opt.textContent = item.TenNoidung;
+                            if (item.id == currentVal) opt.selected = true;
+                            ndSelect.appendChild(opt);
+                        });
+                    }).catch(e => { console.error(e); });
+            } else {
+                ndSelect.innerHTML = '<option value="">-- Chọn ND KT --</option>';
+            }
+        } catch(e) { console.error("Lỗi filterNoiDung", e); }
+    }
+
+    function previewIcon(input) {
+        try {
+            const label = input.parentElement;
+            const icon = label.querySelector('.camera-icon');
+            const img = label.querySelector('.img-preview');
+            const viewBtn = label.nextElementSibling;
+            const clearBtn = viewBtn ? viewBtn.nextElementSibling : null;
+            
+            if (input.files && input.files[0]) {
+                if(icon) icon.classList.add('d-none');
+                const url = URL.createObjectURL(input.files[0]);
+                if(img) {
+                    img.classList.remove('d-none');
+                    img.src = url;
+                }
+                if(viewBtn && viewBtn.title === 'Xem ảnh') {
+                    viewBtn.classList.remove('d-none');
+                    if (viewBtn.tagName === 'A') viewBtn.href = url;
+                }
+                if(clearBtn && clearBtn.title === 'Xóa ảnh') clearBtn.classList.remove('d-none');
+            } else {
+                if(icon) icon.classList.remove('d-none');
+                if(img) {
+                    img.classList.add('d-none');
+                    img.src = '';
+                }
+                if(viewBtn && viewBtn.title === 'Xem ảnh') {
+                    viewBtn.classList.add('d-none');
+                    if (viewBtn.tagName === 'A') viewBtn.removeAttribute('href');
+                }
+                if(clearBtn && clearBtn.title === 'Xóa ảnh') clearBtn.classList.add('d-none');
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            if (isEditMode || "{{ default_khoi }}" || "{{ default_mon }}") {
+                // Edit mode: init cascade dropdown theo giá trị đã saved, rồi init form
+                const savedMachId = "{{ cau_hoi.MachKienThuc_id|default:default_mach }}";
+                const savedNdId   = "{{ cau_hoi.NoiDungKienThuc_id|default:default_noidung }}";
+                const savedKhoiId = "{{ cau_hoi.Khoi_id|default:default_khoi }}";
+                const savedMonId  = "{{ cau_hoi.MonHoc_id|default:default_mon }}";
+
+                if (savedKhoiId || savedMonId) {
+                    // Fetch Mach theo Khoi + Mon
+                    fetch(`{% url 'api_mach_theo_mon_khoi' %}?khoi_id=${savedKhoiId}&mon_id=${savedMonId}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            try {
+                                const machSelect = document.querySelector('select[name="MachKienThuc"]');
+                                machSelect.innerHTML = '<option value="">-- Chọn Mạch KT --</option>';
+                                data.forEach(function(item) {
+                                    const opt = document.createElement('option');
+                                    opt.value = item.id;
+                                    opt.textContent = item.TenMach;
+                                    if (String(item.id) === String(savedMachId)) opt.selected = true;
+                                    machSelect.appendChild(opt);
+                                });
+                            } catch(e) { console.error(e); }
+
+                            if (savedMachId) {
+                                // Fetch NoiDung theo Mach
+                                return fetch(`{% url 'api_noidung_theo_mach' %}?mach_id=${savedMachId}`)
+                                    .then(r => r.json())
+                                    .then(data2 => {
+                                        try {
+                                            const ndSelect = document.querySelector('select[name="NoiDungKienThuc"]');
+                                            ndSelect.innerHTML = '<option value="">-- Chọn ND KT --</option>';
+                                            data2.forEach(function(item) {
+                                                const opt = document.createElement('option');
+                                                opt.value = item.id;
+                                                opt.textContent = item.TenNoidung;
+                                                if (String(item.id) === String(savedNdId)) opt.selected = true;
+                                                ndSelect.appendChild(opt);
+                                            });
+                                        } catch(e) { console.error(e); }
+                                        initForm();
+                                    });
+                            } else {
+                                initForm();
+                            }
+                        })
+                        .catch(function(err) { 
+                            console.error("Lỗi khi fetch API Mạch/Nội dung:", err);
+                            initForm(); 
+                        });
+                } else {
+                    initForm();
+                }
+            } else {
+                initForm();
+            }
+        } catch(e) {
+            console.error("Lỗi nghiêm trọng khi DOMContentLoaded:", e);
+            alert("Lỗi nghiêm trọng khi tải form: " + e.message);
+            initForm();
+        }
+
+        // Track unsaved changes
+        const form = document.getElementById('questionForm');
+        if (form) {
+            form.addEventListener('input', () => { window.isDirty = true; });
+            form.addEventListener('change', () => { window.isDirty = true; });
+            form.addEventListener('submit', () => { window.isDirty = false; });
+        }
+    });
+
+    window.isDirty = false;
+    function confirmCancel(e) {
+        if (window.isDirty) {
+            if (!confirm('Bạn có thay đổi chưa lưu. Bạn có chắc chắn muốn hủy bỏ?')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // ===== AI SUGGEST QUESTION =====
+    async function aiSuggestQuestion() {
+        // Đọc giá trị phân loại hiện tại
+        const khoiEl = document.querySelector('select[name="Khoi"]');
+        const monEl  = document.querySelector('select[name="MonHoc"]');
+        const machEl = document.querySelector('select[name="MachKienThuc"]');
+        const ndEl   = document.querySelector('select[name="NoiDungKienThuc"]');
+        const dangEl = document.getElementById('dangCauHoi');
+        const mucDoEl = document.querySelector('select[name="MucDo"]');
+
+        const khoiText  = khoiEl?.options[khoiEl.selectedIndex]?.text || '';
+        const monText   = monEl?.options[monEl.selectedIndex]?.text || '';
+        const machText  = machEl?.options[machEl.selectedIndex]?.text || '';
+        const ndText    = ndEl?.options[ndEl.selectedIndex]?.text || '';
+        const dangText  = dangEl?.options[dangEl.selectedIndex]?.text || '';
+        const mucDoText = mucDoEl?.options[mucDoEl.selectedIndex]?.text || '';
+        const extraReq  = (document.getElementById('aiQuestionRequirement')?.value || '').trim();
+
+        // Kiểm tra bắt buộc phải chọn đủ phân loại
+        if (!khoiEl?.value || !monEl?.value || !machEl?.value || !ndEl?.value || !dangEl?.value || !mucDoEl?.value) {
+            alert('Vui lòng chọn đầy đủ các thông tin phân loại (Khối, Môn học, Mạch kiến thức, Nội dung KT, Dạng câu hỏi, Mức độ) trước khi yêu cầu AI gợi ý câu hỏi!');
+            return;
+        }
+
+        const btn = document.getElementById('btnAiSuggestQ');
+        const status = document.getElementById('aiSuggestQStatus');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>AI đang tạo câu hỏi...';
+        status.textContent = '';
+
+        try {
+            const res = await fetch('{% url "api_suggest_question" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    khoi: khoiText,
+                    mon: monText,
+                    mach: machText,
+                    noidung: ndText,
+                    dang: dangText,
+                    muc_do: mucDoText,
+                    requirement: extraReq
+                })
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                alert('Lỗi AI: ' + data.error);
+                return;
+            }
+
+            // Điền câu hỏi vào textarea
+            const textarea = document.getElementById('noiDungCauHoi');
+            if (textarea) {
+                textarea.value = data.question_content || '';
+                textarea.dispatchEvent(new Event('input'));
+                textarea.focus();
+                // Cuộn xuống textarea
+                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Tự động điền các thành phần đáp án tương ứng nếu AI sinh đồng thời
+            if (data.matching_pairs && data.matching_pairs.length > 0) {
+                const matchList = document.getElementById('matchList');
+                if (matchList) {
+                    matchList.innerHTML = '';
+                    data.matching_pairs.forEach(function(p) {
+                        addMatchRow({NoiDungTrai: p.left, NoiDung: p.right});
+                    });
+                }
+            } else if (data.fib_answers && data.fib_answers.length > 0) {
+                const fibList = document.getElementById('fibList');
+                if (fibList) {
+                    fibList.innerHTML = '';
+                    data.fib_answers.forEach(function(ans) {
+                        addFIBRow(ans);
+                    });
+                    syncFIBHidden();
+                }
+            } else if (data.tf_statements && data.tf_statements.length > 0) {
+                const tfList = document.getElementById('tfList');
+                if (tfList) {
+                    tfList.innerHTML = '';
+                    data.tf_statements.forEach(function(stmt) {
+                        addTFRow({NoiDung: stmt.statement, NoiDungTrai: stmt.correct});
+                    });
+                }
+            }
+
+            status.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>AI đã tạo câu hỏi và cấu trúc hoàn chỉnh!</span>';
+
+        } catch (err) {
+            alert('Lỗi kết nối: ' + err);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-lightbulb me-1"></i>✨ Gợi ý câu hỏi bằng AI';
+        }
+    }
+
+    // ===== AI SUGGEST ANSWERS =====
+    async function aiSuggestAnswers() {
+        const content = document.getElementById('noiDungCauHoi').value.trim();
+        if (!content) {
+            alert('Vui lòng nhập nội dung câu hỏi trước khi yêu cầu AI gợi ý đáp án!');
+            return;
+        }
+
+        const requirement = (document.getElementById('aiRequirement')?.value || '').trim();
+        const btn = document.getElementById('btnAiSuggest');
+        const status = document.getElementById('aiSuggestStatus');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>AI đang suy nghĩ...';
+        status.textContent = '';
+
+        try {
+            const res = await fetch('{% url "api_ai_suggest" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ 
+                    question_content: content, 
+                    requirement: requirement,
+                    dang: dangCauHoiSelect.value
+                })
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                alert('Lỗi AI: ' + data.error);
+                return;
+            }
+
+            const q = data.question;
+            const dang = dangCauHoiSelect.value || currentDang || 'EssayShort';
+            
+            if (dang === 'MCQ' || dang === 'MSQ') {
+                // Đảm bảo đang ở dạng MCQ nếu đang chọn MCQ
+                hinhThucSelect.selectedIndex = 0;
+                populateDangDropdown('MCQ');
+                dangCauHoiSelect.value = 'MCQ';
+                renderAnswerArea();
+
+                await new Promise(r => setTimeout(r, 100));
+                const choicesList = document.getElementById('choicesList');
+                if (!choicesList) return;
+                choicesList.innerHTML = '';
+
+                const answers = q.answers || [];
+                const correctIdx = typeof q.correct === 'number' ? q.correct : 0;
+
+                answers.forEach(function(ans, idx) {
+                    const row = document.createElement('div');
+                    row.className = 'input-group mb-2';
+                    const label = String.fromCharCode(65 + idx);
+                    const ansText = (typeof ans === 'object') ? (ans.text || '') : ans;
+                    const cleanText = ansText.replace(/^[A-Z][.)\s]+/, '').trim();
+
+                    row.innerHTML = `
+                        <div class="input-group-text bg-white">
+                            <input class="form-check-input mt-0" type="radio" name="IsCorrect" value="${idx}" ${idx === correctIdx ? 'checked' : ''}>
+                        </div>
+                        <input type="text" name="ChoiceLabel" class="form-control text-center fw-bold text-primary" style="max-width:50px;" value="${label}" required>
+                        <input type="text" name="ChoiceContent" class="form-control" value="${cleanText.replace(/"/g, '&quot;')}" required>
+                        <label class="input-group-text bg-white cursor-pointer px-2" style="cursor:pointer;">
+                            <i class="fas fa-camera text-primary camera-icon"></i>
+                            <img class="img-preview d-none" style="height:20px;max-width:40px;object-fit:contain;">
+                            <input type="file" name="ChoiceImage_${idx}" class="d-none" accept="image/*" onchange="previewIcon(this)">
+                        </label>
+                        <button class="btn btn-outline-danger px-2" type="button" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+                    `;
+                    choicesList.appendChild(row);
+                });
+                status.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>AI đã gợi ý ' + answers.length + ' đáp án!</span>';
+            } else if (isEssayDang(dang)) {
+                // Tự luận: điền đáp án vào textarea
+                renderAnswerArea();
+                await new Promise(r => setTimeout(r, 100));
+                
+                // Tìm textarea DapAnMau. Nó có thể nằm trong id="__essayDapAnMauTA" hoặc trong name="DapAnMau"
+                const essayTa = document.querySelector('textarea[name="DapAnMau"]');
+                if (essayTa) {
+                     essayTa.value = q.essay_answer || '';
+                     essayTa.dispatchEvent(new Event('input'));
+                     essayTa.focus();
+                }
+                status.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>AI đã gợi ý đáp án mẫu!</span>';
+            } else if (dang === 'Matching') {
+                renderAnswerArea();
+                await new Promise(r => setTimeout(r, 100));
+                const matchList = document.getElementById('matchList');
+                if (matchList) {
+                    matchList.innerHTML = '';
+                    const pairs = q.matching_pairs || q.answers || [];
+                    pairs.forEach(function(pair) {
+                        const left = (typeof pair === 'object') ? (pair.left || pair.NoiDungTrai || '') : '';
+                        const right = (typeof pair === 'object') ? (pair.right || pair.NoiDung || '') : '';
+                        addMatchRow({NoiDungTrai: left, NoiDung: right});
+                    });
+                    status.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>AI đã gợi ý ${pairs.length} cặp ghép nối!</span>`;
+                }
+            } else if (dang === 'FIB') {
+                renderAnswerArea();
+                await new Promise(r => setTimeout(r, 100));
+                const fibList = document.getElementById('fibList');
+                if (fibList) {
+                    fibList.innerHTML = '';
+                    const fibAnswers = q.fib_answers || q.answers || [];
+                    fibAnswers.forEach(function(ans) {
+                        const val = (typeof ans === 'object') ? (ans.text || ans.NoiDung || '') : ans;
+                        addFIBRow(val);
+                    });
+                    syncFIBHidden();
+                    status.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>AI đã gợi ý ${fibAnswers.length} đáp án điền khuyết!</span>`;
+                }
+            } else if (dang === 'TF') {
+                renderAnswerArea();
+                await new Promise(r => setTimeout(r, 100));
+                const tfList = document.getElementById('tfList');
+                if (tfList) {
+                    tfList.innerHTML = '';
+                    const statements = q.tf_statements || q.answers || [];
+                    statements.forEach(function(item) {
+                        const stmt = (typeof item === 'object') ? (item.statement || item.NoiDung || '') : item;
+                        const label = (typeof item === 'object') ? (item.correct || item.NoiDungTrai || 'Đúng') : 'Đúng';
+                        addTFRow({NoiDung: stmt, NoiDungTrai: label});
+                    });
+                    status.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>AI đã gợi ý ${statements.length} mệnh đề Đúng/Sai!</span>`;
+                }
+            }
+
+        } catch (err) {
+            alert('Lỗi kết nối: ' + err);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-robot me-1"></i>✨ Gợi ý đáp án bằng AI';
+        }
+    }
+
+    try {
+        const formElem = document.querySelector('form');
+        if (formElem) {
+            formElem.addEventListener('submit', function() {
+                if (typeof syncFIBHidden === 'function') syncFIBHidden();
+                if (typeof reindexMatchRows === 'function') reindexMatchRows();
+            });
+        }
+    } catch(e) {}
+</script>
+{% endblock %}

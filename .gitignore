@@ -1,0 +1,11 @@
+venv/
+.idea/
+__pycache__/
+*.pyc
+media/
+*.log
+*.pot
+*.pyg
+.DS_Store
+.env
+patch_*.py
